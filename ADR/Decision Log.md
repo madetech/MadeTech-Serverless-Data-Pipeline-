@@ -1,5 +1,5 @@
 # Overview 
-Last Updated: 1/09/2026
+Last Updated: 07/09/2026
 
 This document details the decisions made for the project. 
 
@@ -452,13 +452,47 @@ Containerized Lambdas, whilst allowing for greater storage, require the usage of
 
 ## Context 
 
+To automate the scheduling of the ETL pipeline on AWS. 
+
+The current flaw of the current ETL pipeline design is that the initial AWS Lambda, **api_extraction** must be triggered manually in order to run the rest of the pipeline. 
+
+In order to choose a component, two options were discussed, and weighed up for their pros and cons on Thursday 3rd September 2026. 
+
+The two options were: 
+
+- AWS EventBridge Scheduler 
+- AWS Step Functions
+
+
+## Other Options Considered 
+
+- AWS Step Functions
+- AWS Managed Apache AirFlow 
+- AWS SageMaker 
+
 ## Decision 
+
+The decision was to go with AWS EventBridge Scheduler to automate the running the pipeline. 
+
+The schedule can be setup via a Crontab expression 
+
+This is due to the fact that only one lambda, **api_extraction** , must be triggered in order to execute the pipeline. 
+
+However, it was discussed that, should the solution be dependent on different lambdas, which are responsible for extracting from different types of data sources, that a Step Function would be appropriate. 
+
+This decision is subject to change if there are extra AWS Lambdas required, which satisfy the above conditions. 
 
 ## Consequences 
 
 ### Advantages 
 
++ Simplicity of deployment within the pipeline.
++ 14 million invocations a month for free.
++ Able to hook up CloudWatch Logs to Eventbridge Scheduler.
+
 ### Disadvantages
+
+- Simplified approach. Will require different EventBridge schedulers for different extraction based lambda approaches.
 
 # 011 - Component Decision -  Mechanism Change
 
