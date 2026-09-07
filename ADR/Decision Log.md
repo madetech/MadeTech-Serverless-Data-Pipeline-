@@ -1,5 +1,5 @@
 # Overview 
-Last Updated: 1/09/2026
+Last Updated: 07/09/2026
 
 This document details the decisions made for the project. 
 
@@ -387,33 +387,165 @@ Uploads tables to the database using the connection created in **connect_to_db**
 
 ## Decision 
 
+The decision is to go with an Object Oriented Programming (OOP) approach as this will create a package of resuable, custom-made python modules, which can be utilized within other future project endeavours. 
+
 ## Consequences 
 
 ### Advantages 
 
++ Reusable Python modules, which can be used across future projects.
++ Isolates functionalities into different methods, which can be called within one instance of a class.
++ Can use inheritance to create child classes of the parent class to cover situations where custom logic is needed. 
+
 ### Disadvantages 
 
+- Difficult to maintain in comparison to functional programming (one script vs three scripts).
+- Requires robust documentation on class strategies, such as inheritance.
+- Has the potential to be an over-engineered solution. 
 
 # 009 - AWS Lambda Deployment Strategy Using Lambda Layers
 
 ## Context 
 
+To facilitate the execution of AWS Lambda functions, which contain external libraries and dependencies. 
+
+List of known dependencies. 
+
+- Pandas
+- Requests
+- SQLAlchemy
+- Numpy 
+
+Other alternative deployment options 
+
+- Containerised Lambda Function
+
 ## Decision 
+
+The decision was to go for a deployment featuring lambda layers. 
+
+This was because lambda layers act as a reusable dependency layer, which can be attached to each Lambda function within the project. 
+
+Containerized Lambdas, whilst allowing for greater storage, require the usage of AWS Elastic Container Registry (ECR), which will incur a greater level of costs attached to the project. 
+
+## References Considered 
+
+- https://pcg.io/insights/lambda-containers/
 
 ## Consequences 
 
 ### Advantages 
 
++ Reusable dependencies layer, which is compatible with both Lambda functions.
++ Can be updated with differing versions both on AWS Lambda and version control via Git
++ More cost-effective than containerized lambdas. 
 ### Disadvantages
+
+- Running Numpy on MacOS requires it to be built within an Amazon Linux Docker Container, which increases tech debt.
+(For more information on this issue, check this link: https://medium.com/@humzahmalik/how-to-import-pandas-on-aws-lambda-for-mac-users-using-layers-44079af6a512 ) 
+
+- Lambda size limit is 50 KB. Larger files cannot be uploaded to AWS Lambda directly. Instead, they must be uploaded to AWS S3 before uploading them to AWS Lambda.
+
+- Greater operational overhead in comparison to Lambda Layers. 
 
 # 010 - Component Decision -  AWS EventBridge Scheduler 
 
 ## Context 
 
+To automate the scheduling of the ETL pipeline on AWS. 
+
+The current flaw of the current ETL pipeline design is that the initial AWS Lambda, **api_extraction** must be triggered manually in order to run the rest of the pipeline. 
+
+In order to choose a component, two options were discussed, and weighed up for their pros and cons on Thursday 3rd September 2026. 
+
+The two options were: 
+
+- AWS EventBridge Scheduler 
+- AWS Step Functions
+
+
+## Other Options Considered 
+
+- AWS Step Functions
+- AWS Managed Apache AirFlow 
+- AWS SageMaker 
+
 ## Decision 
+
+The decision was to go with AWS EventBridge Scheduler to automate the running the pipeline. 
+
+The schedule can be setup via a Crontab expression 
+
+This is due to the fact that only one lambda, **api_extraction** , must be triggered in order to execute the pipeline. 
+
+However, it was discussed that, should the solution be dependent on different lambdas, which are responsible for extracting from different types of data sources, that a Step Function would be appropriate. 
+
+This decision is subject to change if there are extra AWS Lambdas required, which satisfy the above conditions. 
 
 ## Consequences 
 
 ### Advantages 
 
++ Simplicity of deployment within the pipeline.
++ 14 million invocations a month for free.
++ Able to hook up CloudWatch Logs to Eventbridge Scheduler.
+
 ### Disadvantages
+
+- Simplified approach. Will require different EventBridge schedulers for different extraction based lambda approaches.
+
+# 011 - Component Decision -  Mechanism Change
+
+## Context 
+
+Having a meeting with lead engineer, Russel Mclean, revealed an innate flaw within the pipeline mechanism. 
+
+Below is the current pipeline mechanism as of 07.09.2026 
+
+<img width="2652" height="802" alt="image" src="https://github.com/user-attachments/assets/33475bf9-ad6a-4f27-a840-338afbeb0e90" />
+
+The current issue with the pipeline is that it operates a hybrid mechanism. 
+
+From EventBridge Scheduler to the **api_extraction** lambda, the mechanism adopted is pull. 
+
+However, from S3 onwards, the mechanism adopted is push. 
+
+This is due to AWS S3 acting as a the source system, which is controlled by an Eventbridge Notification. 
+
+This enables AWS S3 to push its data to AWS RDS. 
+
+When creating a data pipeline, it is ideal to adopt a set mechanism. 
+
+## Decision 
+
+The Decision is to add a step function, which is responsible for triggering both lambda functions. 
+
+The updated diagram is shown below. 
+
+<img width="1299" height="443" alt="image" src="https://github.com/user-attachments/assets/0e2db985-f93d-4de6-b8a3-cfb97decd8c1" />
+
+Upon the success of each lambda function, the next lambda function will be triggered. 
+
+Upon failure, the error logs will be sent to AWS CloudWatch for debugging purposes. 
+
+From a pricing standpoint, the free tier of AWS Step Functions allows for 4000 free *state transitions per month on Standard Workflows, but Express workflows are on a pay-as-you-go model. 
+
+* = Where a state transition represents each time a workflow step is executed.
+
+Reference: https://sheikhzuber.medium.com/aws-step-functions-billing-overview-632f8ec07b37 
+
+After which, the step function is billed under a pay-as-you-go model.
+
+The type of workflow to adopt is yet to be decided. 
+
+## Consequences 
+
+### Advantages 
+
++ Addresses the hybrid mechanism; shifting the mechanism to a pull based architecture.
++ Cloudwatch logs allow for developers to debug failed runs
+
+### Disadvantages
+
+- Creates extra technical debt by adding more components.
+- Potentially increases AWS costs depending on the step function workflow selected
