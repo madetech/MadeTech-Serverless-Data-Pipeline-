@@ -498,11 +498,54 @@ This decision is subject to change if there are extra AWS Lambdas required, whic
 
 ## Context 
 
+Having a meeting with lead engineer, Russel Mclean, revealed an innate flaw within the pipeline mechanism. 
+
+Below is the current pipeline mechanism as of 07.09.2026 
+
+<img width="2652" height="802" alt="image" src="https://github.com/user-attachments/assets/33475bf9-ad6a-4f27-a840-338afbeb0e90" />
+
+The current issue with the pipeline is that it operates a hybrid mechanism. 
+
+From EventBridge Scheduler to the **api_extraction** lambda, the mechanism adopted is pull. 
+
+However, from S3 onwards, the mechanism adopted is push. 
+
+This is due to AWS S3 acting as a the source system, which is controlled by an Eventbridge Notification. 
+
+This enables AWS S3 to push its data to AWS RDS. 
+
+When creating a data pipeline, it is ideal to adopt a set mechanism. 
+
 ## Decision 
+
+The Decision is to add a step function, which is responsible for triggering both lambda functions. 
+
+The updated diagram is shown below. 
+
+<img width="1299" height="443" alt="image" src="https://github.com/user-attachments/assets/0e2db985-f93d-4de6-b8a3-cfb97decd8c1" />
+
+Upon the success of each lambda function, the next lambda function will be triggered. 
+
+Upon failure, the error logs will be sent to AWS CloudWatch for debugging purposes. 
+
+From a pricing standpoint, the free tier of AWS Step Functions allows for 4000 free *state transitions per month on Standard Workflows, but Express workflows are on a pay-as-you-go model. 
+
+* = Where a state transition represents each time a workflow step is executed.
+
+Reference: https://sheikhzuber.medium.com/aws-step-functions-billing-overview-632f8ec07b37 
+
+After which, the step function is billed under a pay-as-you-go model.
+
+The type of workflow to adopt is yet to be decided. 
 
 ## Consequences 
 
 ### Advantages 
 
++ Addresses the hybrid mechanism; shifting the mechanism to a pull based architecture.
++ Cloudwatch logs allow for developers to debug failed runs
+
 ### Disadvantages
 
+- Creates extra technical debt by adding more components.
+- Potentially increases AWS costs depending on the step function workflow selected
