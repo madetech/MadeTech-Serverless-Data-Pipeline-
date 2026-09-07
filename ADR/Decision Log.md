@@ -387,24 +387,66 @@ Uploads tables to the database using the connection created in **connect_to_db**
 
 ## Decision 
 
+The decision is to go with an Object Oriented Programming (OOP) approach as this will create a package of resuable, custom-made python modules, which can be utilized within other future project endeavours. 
+
 ## Consequences 
 
 ### Advantages 
 
++ Reusable Python modules, which can be used across future projects.
++ Isolates functionalities into different methods, which can be called within one instance of a class.
++ Can use inheritance to create child classes of the parent class to cover situations where custom logic is needed. 
+
 ### Disadvantages 
 
+- Difficult to maintain in comparison to functional programming (one script vs three scripts).
+- Requires robust documentation on class strategies, such as inheritance.
+- Has the potential to be an over-engineered solution. 
 
 # 009 - AWS Lambda Deployment Strategy Using Lambda Layers
 
 ## Context 
 
+To facilitate the execution of AWS Lambda functions, which contain external libraries and dependencies. 
+
+List of known dependencies. 
+
+- Pandas
+- Requests
+- SQLAlchemy
+- Numpy 
+
+Other alternative deployment options 
+
+- Containerised Lambda Function
+
 ## Decision 
+
+The decision was to go for a deployment featuring lambda layers. 
+
+This was because lambda layers act as a reusable dependency layer, which can be attached to each Lambda function within the project. 
+
+Containerized Lambdas, whilst allowing for greater storage, require the usage of AWS Elastic Container Registry (ECR), which will incur a greater level of costs attached to the project. 
+
+## References Considered 
+
+- https://pcg.io/insights/lambda-containers/
 
 ## Consequences 
 
 ### Advantages 
 
++ Reusable dependencies layer, which is compatible with both Lambda functions.
++ Can be updated with differing versions both on AWS Lambda and version control via Git
++ More cost-effective than containerized lambdas. 
 ### Disadvantages
+
+- Running Numpy on MacOS requires it to be built within an Amazon Linux Docker Container, which increases tech debt.
+(For more information on this issue, check this link: https://medium.com/@humzahmalik/how-to-import-pandas-on-aws-lambda-for-mac-users-using-layers-44079af6a512 ) 
+
+- Lambda size limit is 50 KB. Larger files cannot be uploaded to AWS Lambda directly. Instead, they must be uploaded to AWS S3 before uploading them to AWS Lambda.
+
+- Greater operational overhead in comparison to Lambda Layers. 
 
 # 010 - Component Decision -  AWS EventBridge Scheduler 
 
@@ -417,3 +459,16 @@ Uploads tables to the database using the connection created in **connect_to_db**
 ### Advantages 
 
 ### Disadvantages
+
+# 011 - Component Decision -  Mechanism Change
+
+## Context 
+
+## Decision 
+
+## Consequences 
+
+### Advantages 
+
+### Disadvantages
+
