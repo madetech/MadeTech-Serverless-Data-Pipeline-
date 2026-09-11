@@ -33,11 +33,6 @@ class HistoricalDataProcessor:
         df[hash_column_name] = hash_input.agg("|".join, axis=1).apply(
             lambda x: hashlib.sha256(x.encode("utf-8")).hexdigest()
         )
-
-        # Combine specified columns into a single string per row, then hash
-        # df[hash_column_name] = df[column_list].astype(str).agg('|'.join, axis=1).apply(
-        #     lambda x: hashlib.sha256(x.encode('utf-8')).hexdigest()
-        # )
         return df 
 
     def compare_hashes(self, current_df : DataFrame, new_df : DataFrame, business_key : Union[str, List[str], None] = None, hash_column_name : str="hash_column"):
