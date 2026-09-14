@@ -10,7 +10,7 @@ resource "aws_vpc" "main" {
 # Create Subnet 1 (Zone A)
 resource "aws_subnet" "subnet_a" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = var.subnet_a_cidr # "10.0.1.0/24"
+  cidr_block        = var.subnet_a_cidr       # "10.0.1.0/24"
   availability_zone = var.availability_zone_a # "eu-west-2a"
 
   tags = {
@@ -21,7 +21,7 @@ resource "aws_subnet" "subnet_a" {
 # Create Subnet 2 (Zone B - Required for RDS)
 resource "aws_subnet" "subnet_b" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = var.subnet_b_cidr # "10.0.2.0/24"
+  cidr_block        = var.subnet_b_cidr       # "10.0.2.0/24"
   availability_zone = var.availability_zone_b # "eu-west-2b"
 
   tags = {
@@ -40,23 +40,23 @@ resource "aws_db_subnet_group" "main" {
 }
 
 # Create the Security Group for the Database
-resource "aws_security_group" "main"{
-    name = "rds_security_group"
-    description = "Security group for RDS Postgres Instance"
-    vpc_id = aws_vpc.main.id
-    ingress {
-        from_port = 5432
-        to_port =  5432
-        protocol = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-    egress {
-        from_port = 0 
-        to_port = 0 
-        protocol = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-    tags = {
-        name = var.security_group_name #"rds-security-group"
-    }
+resource "aws_security_group" "main" {
+  name        = "rds_security_group"
+  description = "Security group for RDS Postgres Instance"
+  vpc_id      = aws_vpc.main.id
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    name = var.security_group_name #"rds-security-group"
+  }
 }
