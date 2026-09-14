@@ -45,7 +45,7 @@ def database_table_name_check(table_name : str):
     
 def load_silver_table(table_name : str):
     ### SILVER LAYER ###
-    table_name_check = database_table_name_check(table_name)
+    table_name_check = database_table_name_check(f"silver_{table_name}")
 
     if table_name_check == True:
         # Read in the bronze and silver tables 
