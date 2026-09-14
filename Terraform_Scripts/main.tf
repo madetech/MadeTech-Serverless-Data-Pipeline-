@@ -1,24 +1,7 @@
 provider "aws" {
   region = "eu-west-2"
 }
-# IAM role for Lambda execution
-# data "aws_iam_policy_document" "assume_role" {
-#   statement {
-#     effect = "Allow"
 
-#     principals {
-#       type        = "Service"
-#       identifiers = ["lambda.amazonaws.com"]
-#     }
-
-#     actions = ["sts:AssumeRole"]
-#   }
-# }
-# #TODO: Implement a role, which covers lambda execution and S3 access. 
-# resource "aws_iam_role" "lambda_execution" {
-#   name               = "lambda_execution_role"
-#   assume_role_policy = data.aws_iam_policy_document.assume_role.json
-# }
 module "vpc" {
   source = "./modules/networking/vpc"
 
@@ -34,28 +17,29 @@ module "vpc" {
 
 # S3 Bucket Creation
 module "s3" {
-  source = "./modules/s3"
-  bucket_name = "mt-serverless-data-pipeline-bucket-dev"
+  source             = "./modules/s3"
+  bucket_name        = "mt-serverless-data-pipeline-bucket-dev"
   versioning_enabled = false
-  environment_name = var.environment_name
-  project_name = "data-pipeline"
-  
+  environment_name   = var.environment_name
+  project_name       = "data-pipeline"
+
 }
 
 module "rds" {
-  source = "./modules/rds"
-  rds_identifier          = "dbapiextraction"  
-  allocated_storage    = 10
-  db_name              = "target_db"
-  engine               = "postgres"
-  engine_version       = "18.2"
-  instance_class       = "db.t3.micro"
-  rds_user             = "db_user"
-  rds_password         = var.rds_password
-  db_subnet_group_name = module.vpc.db_subnet_group_name
-  skip_final_snapshot  = true
-  publicly_accessible  = false 
-  project_name         = var.application_name
+  source                 = "./modules/rds"
+  rds_identifier         = "dbapiextraction"
+  allocated_storage      = 10
+  db_name                = "target_db"
+  engine                 = "postgres"
+  engine_version         = "18.2"
+  instance_class         = "db.t3.micro"
+  rds_user               = "db_user"
+  rds_password           = var.rds_password
+  db_subnet_group_name   = module.vpc.db_subnet_group_name
+  vpc_security_group_ids = [module.vpc.security_group_id]
+  skip_final_snapshot    = true
+  publicly_accessible    = false
+  project_name           = var.application_name
 }
 
 module "iam" {
@@ -66,108 +50,30 @@ module "iam" {
   rds_arn       = module.rds.db_arn
 }
 
-# # Package the api extraction Lambda function code
-# data "archive_file" "api_extraction" {
-#  type        = "zip"
-#  source_file = "${path.module}/src/lambda.py"
-#  output_path = "${path.module}/lambda/api_extraction.zip"
-# }
+module "lambda" {
+  source = "./modules/lambda"
 
-# # Package the data transformation Lambda function code
-# data "archive_file" "data_transformation" {
-#  type        = "zip"
-#  source_file = "${path.module}/src/lambda.py"
-#  output_path = "${path.module}/lambda/data_transformation.zip"
-# }
-# # API Extraction Lambda function
-# resource "aws_lambda_function" "api_extraction" {
-#   filename      = "${path.module}/lambda/api_extraction.zip"
-#   function_name = "python_terraform_api_extraction"
-#   role          = aws_iam_role.lambda_execution.arn
-#   handler       = "index.handler"
-#   source_code_hash = data.archive_file.api_extraction.output_base64sha256
+  project_name            = var.application_name
+  environment_name        = var.environment_name
+  extraction_role_arn     = module.iam.extraction_lambda_role_arn
+  transformation_role_arn = module.iam.transformation_lambda_role_arn
+  s3_bucket_name          = module.s3.bucket_id
+  vpc_id                  = module.vpc.vpc_id
+  subnet_ids              = module.vpc.subnet_ids
+  security_group_id       = module.vpc.security_group_id
+  db_endpoint             = module.rds.db_endpoint
+  db_name                 = "target_db"
+  db_user                 = "db_user"
+  db_password             = var.rds_password
+  lambda_layer_zip_path   = "${path.root}/python.zip"
+}
 
-#   runtime = "python3.10"
+module "eventbridge" {
+  source = "./modules/eventbridge"
 
-#   environment {
-#     variables = {
-#       Environment = var.environment_name
-#       LOG_LEVEL   = var.log_level
-#     }
-#   }
+  project_name                 = var.application_name
+  s3_bucket_name               = module.s3.bucket_id
+  transformation_function_arn  = module.lambda.transformation_function_arn
+  transformation_function_name = module.lambda.transformation_function_name
+}
 
-#   tags = {
-#     Environment = var.environment_name
-#     Application = var.application_name
-#   }
-# }
-
-# # Transformation Lambda function
-# resource "aws_lambda_function" "data_transformation" {
-#   filename      = "${path.module}/lambda/data_transformation.zip"
-#   function_name = "python_terraform_data_transformation"
-#   role          = aws_iam_role.lambda_execution.arn
-#   handler       = "index.handler"
-#   source_code_hash = data.archive_file.data_transformation.output_base64sha256
-
-#   runtime = "python3.10"
-
-#   environment {
-#     variables = {
-#       Environment = var.environment_name
-#       LOG_LEVEL   = var.log_level
-#     }
-#   }
-
-#   tags = {
-#     Environment = var.environment_name
-#     Application = var.application_name
-#   }
-# }
-
-# # Adding CloudWatch Event Bus 
-# resource "aws_cloudwatch_event_bus" "custom_bus" {
-#   name = "my-custom-event-bus"
-# }
-
-# # The Rule (Filters the events passing through your bus)
-# resource "aws_cloudwatch_event_rule" "lambda_rule" {
-#   name           = "route-to-lambda-rule"
-#   event_bus_name = aws_cloudwatch_event_bus.custom_bus.name
-
-#   # Triggers for any event originating from "my.application"
-#   event_pattern = jsonencode({
-#     source = ["aws.s3"]
-#     detail-type = ["Object Created"]
-#     detail = {
-#       bucket = {
-#         name = [aws_s3_bucket.staging_area.id]
-#       }
-#     }
-#   })
-# }
-
-# #TODO: Add to the resource block above to specify the location in which the event is triggered. 
-# # Filters based on object file location matching a prefix string
-#       # object = {
-#       #   key = [{
-#       #     prefix = "test_api/00_staged_files/" # Trailing slash ensures it targets only this folder block
-#       #   }]
-    
-  
-# # The Target (Connects the rule directly to data_transformation Lambda function)
-# resource "aws_cloudwatch_event_target" "lambda_target" {
-#   event_bus_name = aws_cloudwatch_event_bus.custom_bus.name
-#   rule           = aws_cloudwatch_event_rule.lambda_rule.name
-#   target_id      = "SendToLambda"
-#   arn            = aws_lambda_function.data_transformation.arn # References your Lambda function ARN
-# }
-
-# # 4. The Permission (Crucial: Grants EventBridge authority to invoke the Lambda)
-# resource "aws_lambda_permission" "allow_eventbridge" {
-#   statement_id  = "AllowExecutionFromEventBridge"
-#   action        = "lambda:InvokeFunction"
-#   function_name = aws_lambda_function.data_transformation.function_name
-#   principal     = "events.amazonaws.com"
-#   source_arn    = aws_cloudwatch_event_rule.lambda_rule.arn
-# }

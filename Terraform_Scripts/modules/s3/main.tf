@@ -14,3 +14,8 @@ resource "aws_s3_bucket_versioning" "main" {
     status = var.versioning_enabled ? "Enabled" : "Disabled"
   }
 }
+
+resource "aws_s3_bucket_notification" "eventbridge" {
+  bucket      = aws_s3_bucket.main.id
+  eventbridge = true
+}
