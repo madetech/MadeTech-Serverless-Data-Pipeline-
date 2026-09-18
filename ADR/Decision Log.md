@@ -522,7 +522,7 @@ The Decision is to add a step function, which is responsible for triggering both
 
 The updated diagram is shown below. 
 
-<img width="1299" height="443" alt="image" src="https://github.com/user-attachments/assets/0e2db985-f93d-4de6-b8a3-cfb97decd8c1" />
+<img width="3284" height="1190" alt="image" src="https://github.com/user-attachments/assets/3f149e12-d228-40c7-817f-25a3ed7a090b" />
 
 Upon the success of each lambda function, the next lambda function will be triggered. 
 
