@@ -21,5 +21,5 @@ def setup_logger(name: str, level: int = logging.INFO):
         format="%(asctime)s [%(levelname)s] %(name)s :: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S%z",
     )
-    # TODO: EXERCISE: Increase logging detail e.g. line numbers, module name, function name
+
     return logging.getLogger(name)
