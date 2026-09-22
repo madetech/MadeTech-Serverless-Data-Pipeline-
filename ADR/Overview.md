@@ -5,7 +5,7 @@ With the intention to centralize all data extracted from these sources within a 
 
 Below is a high level overview of the diagram for the project. 
 
-<img width="881" height="308" alt="Screenshot 2026-08-19 at 14 31 54" src="https://github.com/user-attachments/assets/109f78dc-f872-4cd9-b649-f4ec88336ac1" />
+<img width="954" height="289" alt="Screenshot 2026-09-03 at 17 07 31" src="https://github.com/user-attachments/assets/bf69d7a5-7877-4598-8fab-944054a9ef90" />
 
 
 ## Breakdown of Components 
