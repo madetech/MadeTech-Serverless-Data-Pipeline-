@@ -1,9 +1,12 @@
 import pandas as pd
-from data_transformation.data_connector import DataConnector
-from data_transformation.data_ingestor import DataIngestor
-from data_transformation.historical_data import HistoricalDataProcessor
-from data_transformation.schema_mapping import SchemaMapping
+from duckdb import InvalidInputException
 from sqlalchemy.types import JSON
+from src.data_transformation.data_connector import DataConnector
+from src.data_transformation.data_ingestor import DataIngestor
+from src.data_transformation.historical_data import HistoricalDataProcessor
+from src.data_transformation.schema_mapping import SchemaMapping
+
+# TODO: Look into replacing print statements with logging statements
 
 ### GLOBAL VARIABLES CLASS INSTANTIATION
 con = DataConnector()
@@ -14,6 +17,7 @@ schema = schema_mapping.load_yaml_schema("table_metadata/table_schema.yaml")
 dtype_mapping = schema_mapping.build_dtype_dict(schema)
 
 credentials = con.read_database_credentials("credentials/db_creds_local.yaml")
+
 con_string = con.create_connection_string(
     credentials, connect_to_database=True, new_db_name="api_data"
 )
@@ -24,14 +28,28 @@ print(db_engine)
 
 def load_bronze_table():
     ### BRONZE LAYER ####
-    df = pd.read_parquet("sample_data/sample_api.parquet")
 
-    bronze_layer_table = ingestor.add_metadata_columns(df)
+    try:
+        bronze_df = pd.read_parquet("sample_data/sample_api.parquet")
+        bronze_layer_table = ingestor.create_duck_db_relation(bronze_df)
+    except InvalidInputException:
+        raise InvalidInputException(
+            "Invalid format. Please create one of the following objects first "
+            "pandas.DataFrame "
+            "duckdb.DuckDBPyRelation "
+            "pyarrow Table, Dataset "
+            "RecordBatchReader "
+            "Scanner "
+            "or NumPy ndarrays with supported format "
+        )
+    bronze_layer_table_with_metadata = ingestor.add_metadata_columns(
+        rel=bronze_layer_table
+    )
 
-    print(bronze_layer_table.columns)
+    print(bronze_layer_table_with_metadata.columns)
 
     con.load_to_db(
-        bronze_layer_table,
+        bronze_layer_table_with_metadata.to_df(),
         db_engine,
         "bronze_fake_ecommerce_api_data",
         "replace",
@@ -103,10 +121,14 @@ def load_silver_table(table_name: str):
             "bronze_fake_ecommerce_api_data", db_engine, "bronze_layer"
         )
 
-        silver_table = ingestor.add_metadata_columns(extracted_bronze_table)
+        duckdb_bronze_table = ingestor.create_duck_db_relation(
+            extracted_bronze_table
+        )
+
+        silver_table = ingestor.add_metadata_columns(duckdb_bronze_table)
 
         con.load_to_db(
-            silver_table,
+            silver_table.to_df(),
             db_engine,
             "silver_fake_ecommerce_api_data",
             "replace",
@@ -121,10 +143,14 @@ def load_gold_table():
         "silver_fake_ecommerce_api_data", db_engine, "silver_layer"
     )
 
-    gold_table = ingestor.add_metadata_columns(extracted_silver_table)
+    duckdb_silver_table = ingestor.create_duck_db_relation(
+        extracted_silver_table
+    )
+
+    gold_table = ingestor.add_metadata_columns(duckdb_silver_table)
 
     con.load_to_db(
-        gold_table,
+        gold_table.to_df(),
         db_engine,
         "gold_fake_ecommerce_api_data",
         "replace",
@@ -139,4 +165,7 @@ def main():
     load_gold_table()
 
 
-main()
+load_bronze_table()
+load_silver_table("fake_ecommerce_api_data")
+load_gold_table()
+# main()
