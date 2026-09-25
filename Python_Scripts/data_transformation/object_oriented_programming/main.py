@@ -1,9 +1,12 @@
 import pandas as pd
-from data_transformation.data_connector import DataConnector
-from data_transformation.data_ingestor import DataIngestor
-from data_transformation.historical_data import HistoricalDataProcessor
-from data_transformation.schema_mapping import SchemaMapping
+from duckdb import InvalidInputException
 from sqlalchemy.types import JSON
+from src.data_transformation.data_connector import DataConnector
+from src.data_transformation.data_ingestor import DataIngestor
+from src.data_transformation.historical_data import HistoricalDataProcessor
+from src.data_transformation.schema_mapping import SchemaMapping
+
+# TODO: Look into replacing print statements with logging statements
 
 ### GLOBAL VARIABLES CLASS INSTANTIATION
 con = DataConnector()
@@ -14,6 +17,7 @@ schema = schema_mapping.load_yaml_schema("table_metadata/table_schema.yaml")
 dtype_mapping = schema_mapping.build_dtype_dict(schema)
 
 credentials = con.read_database_credentials("credentials/db_creds_local.yaml")
+
 con_string = con.create_connection_string(
     credentials, connect_to_database=True, new_db_name="api_data"
 )
@@ -24,14 +28,28 @@ print(db_engine)
 
 def load_bronze_table():
     ### BRONZE LAYER ####
-    df = pd.read_parquet("sample_data/sample_api.parquet")
 
-    bronze_layer_table = ingestor.add_metadata_columns(df)
+    try:
+        bronze_df = pd.read_parquet("sample_data/sample_api.parquet")
+        bronze_layer_table = ingestor.create_duck_db_relation(bronze_df)
+    except InvalidInputException:
+        raise InvalidInputException(
+            "Invalid format. Please create one of the following objects first "
+            "pandas.DataFrame "
+            "duckdb.DuckDBPyRelation "
+            "pyarrow Table, Dataset "
+            "RecordBatchReader "
+            "Scanner "
+            "or NumPy ndarrays with supported format "
+        )
+    bronze_layer_table_with_metadata = ingestor.add_metadata_columns(
+        rel=bronze_layer_table
+    )
 
-    print(bronze_layer_table.columns)
+    print(bronze_layer_table_with_metadata.columns)
 
     con.load_to_db(
-        bronze_layer_table,
+        bronze_layer_table_with_metadata.to_df(),
         db_engine,
         "bronze_fake_ecommerce_api_data",
         "replace",
@@ -66,31 +84,30 @@ def load_silver_table(table_name: str):
         current_silver_table = ingestor.extract_from_database(
             f"silver_{table_name}", db_engine, "silver_layer"
         )
-
-        # Add Hash Columns to both tables
-        bronze_table_hash = history.create_hash_column(bronze_table)
-        silver_table_hash = history.create_hash_column(current_silver_table)
-
-        # Compare both hash columns
-        comparison_df = history.compare_hashes(
-            silver_table_hash, bronze_table_hash, "id"
+        # Convert the pandas dataframes to duckdb relations
+        bronze_table_duckdb = ingestor.create_duck_db_relation(bronze_table)
+        silver_table_duckdb = ingestor.create_duck_db_relation(
+            current_silver_table
         )
-        # Filter out unchanged records
-        altered_records_df = comparison_df[
-            comparison_df["status"] != "unchanged"
-        ]
-        if len(altered_records_df) == 0:
-            print("Empty DataFrame. Skipping table upload")
+
+        combined_table = history.compare_records(
+            bronze_table_duckdb, silver_table_duckdb, "id"
+        )
+        altered_records = history.filter_unchanged_records(
+            combined_table=combined_table
+        )
+        if len(altered_records) == 0:
+            print("Empty Table. Skipping table upload")
         else:
-            # Drop the hash columns from the table
-            no_hashes_df = altered_records_df.drop(
-                columns=["hash_column_current", "hash_column_new"]
+            # Update the timestamp(s) within the silver_table
+
+            appended_silver_table = ingestor.update_timestamp(
+                altered_records, "ingestion_timestamp"
             )
             # TODO: Add in some slowly changing dimension logic here (SCD 1 or 2?)
-            # Add the metadata columns to the no_hashes_df then upload to the db, appending to the table
-            appended_silver_table = ingestor.add_metadata_columns(no_hashes_df)
+
             con.load_to_db(
-                appended_silver_table,
+                appended_silver_table.to_df(),
                 db_engine,
                 f"silver_{table_name}",
                 "append",
@@ -103,10 +120,16 @@ def load_silver_table(table_name: str):
             "bronze_fake_ecommerce_api_data", db_engine, "bronze_layer"
         )
 
-        silver_table = ingestor.add_metadata_columns(extracted_bronze_table)
+        duckdb_bronze_table = ingestor.create_duck_db_relation(
+            extracted_bronze_table
+        )
+
+        silver_table = ingestor.update_timestamp(
+            duckdb_bronze_table, "ingestion_timestamp"
+        )
 
         con.load_to_db(
-            silver_table,
+            silver_table.to_df(),
             db_engine,
             "silver_fake_ecommerce_api_data",
             "replace",
@@ -121,10 +144,16 @@ def load_gold_table():
         "silver_fake_ecommerce_api_data", db_engine, "silver_layer"
     )
 
-    gold_table = ingestor.add_metadata_columns(extracted_silver_table)
+    duckdb_silver_table = ingestor.create_duck_db_relation(
+        extracted_silver_table
+    )
+
+    gold_table = ingestor.update_timestamp(
+        duckdb_silver_table, "ingestion_timestamp"
+    )
 
     con.load_to_db(
-        gold_table,
+        gold_table.to_df(),
         db_engine,
         "gold_fake_ecommerce_api_data",
         "replace",
@@ -139,4 +168,8 @@ def main():
     load_gold_table()
 
 
+# Commented functions for testing purposes
+# load_bronze_table()
+# load_silver_table("fake_ecommerce_api_data")
+# load_gold_table()
 main()
