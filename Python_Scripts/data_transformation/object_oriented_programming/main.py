@@ -84,31 +84,30 @@ def load_silver_table(table_name: str):
         current_silver_table = ingestor.extract_from_database(
             f"silver_{table_name}", db_engine, "silver_layer"
         )
-
-        # Add Hash Columns to both tables
-        bronze_table_hash = history.create_hash_column(bronze_table)
-        silver_table_hash = history.create_hash_column(current_silver_table)
-
-        # Compare both hash columns
-        comparison_df = history.compare_hashes(
-            silver_table_hash, bronze_table_hash, "id"
+        # Convert the pandas dataframes to duckdb relations
+        bronze_table_duckdb = ingestor.create_duck_db_relation(bronze_table)
+        silver_table_duckdb = ingestor.create_duck_db_relation(
+            current_silver_table
         )
-        # Filter out unchanged records
-        altered_records_df = comparison_df[
-            comparison_df["status"] != "unchanged"
-        ]
-        if len(altered_records_df) == 0:
-            print("Empty DataFrame. Skipping table upload")
+
+        combined_table = history.compare_records(
+            bronze_table_duckdb, silver_table_duckdb, "id"
+        )
+        altered_records = history.filter_unchanged_records(
+            combined_table=combined_table
+        )
+        if len(altered_records) == 0:
+            print("Empty Table. Skipping table upload")
         else:
-            # Drop the hash columns from the table
-            no_hashes_df = altered_records_df.drop(
-                columns=["hash_column_current", "hash_column_new"]
+            # Update the timestamp(s) within the silver_table
+
+            appended_silver_table = ingestor.update_timestamp(
+                altered_records, "ingestion_timestamp"
             )
             # TODO: Add in some slowly changing dimension logic here (SCD 1 or 2?)
-            # Add the metadata columns to the no_hashes_df then upload to the db, appending to the table
-            appended_silver_table = ingestor.add_metadata_columns(no_hashes_df)
+
             con.load_to_db(
-                appended_silver_table,
+                appended_silver_table.to_df(),
                 db_engine,
                 f"silver_{table_name}",
                 "append",
@@ -125,7 +124,9 @@ def load_silver_table(table_name: str):
             extracted_bronze_table
         )
 
-        silver_table = ingestor.add_metadata_columns(duckdb_bronze_table)
+        silver_table = ingestor.update_timestamp(
+            duckdb_bronze_table, "ingestion_timestamp"
+        )
 
         con.load_to_db(
             silver_table.to_df(),
@@ -147,7 +148,9 @@ def load_gold_table():
         extracted_silver_table
     )
 
-    gold_table = ingestor.add_metadata_columns(duckdb_silver_table)
+    gold_table = ingestor.update_timestamp(
+        duckdb_silver_table, "ingestion_timestamp"
+    )
 
     con.load_to_db(
         gold_table.to_df(),
@@ -165,7 +168,8 @@ def main():
     load_gold_table()
 
 
-load_bronze_table()
-load_silver_table("fake_ecommerce_api_data")
-load_gold_table()
-# main()
+# Commented functions for testing purposes
+# load_bronze_table()
+# load_silver_table("fake_ecommerce_api_data")
+# load_gold_table()
+main()
