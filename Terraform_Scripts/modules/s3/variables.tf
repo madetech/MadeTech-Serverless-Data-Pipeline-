@@ -1,10 +1,10 @@
 variable "bucket_name" {
-  type = string 
+  type = string
 }
 
-variable "versioning_enabled"{
-    type = bool 
-    default = false
+variable "versioning_enabled" {
+  type    = bool
+  default = false
 }
 
 variable "environment_name" {
