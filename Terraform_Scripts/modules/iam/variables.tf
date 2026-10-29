@@ -9,3 +9,4 @@ variable "s3_bucket_arn" {
 variable "rds_arn" {
   type = string
 }
+
