@@ -1,19 +1,24 @@
 variable "environment_name" {
-    type = string
-    default = "dev"
+  type    = string
+  default = "dev"
 }
 
 variable "log_level" {
-    type = string
-    default = "info"
+  type    = string
+  default = "info"
 }
 
-variable "application_name" {
-  type = string
+variable "s3_staging_bucket_name" {
+  type = string 
+  default = "mt-serverless-data-pipeline-bucket"
+}
+
+variable "project_name" {
+  type    = string
   default = "data_pipeline"
 }
 
 variable "rds_password" {
-  type = string
+  type      = string
   sensitive = true
 }
