@@ -46,7 +46,7 @@ resource "aws_lambda_function" "transformation" {
   role             = var.transformation_role_arn
   handler          = "lambda.lambda_handler"
   runtime          = "python3.12"
-  # layers           = var.lambda_layer_zip_path == null ? [] : [aws_lambda_layer_version.dependencies[0].arn]
+  layers           = var.lambda_layer_zip_path == null ? [] : [aws_lambda_layer_version.dependencies[0].arn]
 
   vpc_config {
     subnet_ids         = var.subnet_ids

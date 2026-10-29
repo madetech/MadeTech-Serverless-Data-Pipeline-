@@ -3,17 +3,39 @@ name = "data-pipeline"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
+authors = [
+    { name = "waynerose-madetech", email = "wayne.rose@madetech.com" }
+]
 requires-python = ">=3.12"
 dependencies = [
-    "boto3>=1.43.74",
+    "black>=26.5.1",
+    "boto3>=1.43.86",
     "ipykernel>=7.3.0",
     "pandas>=3.0.5",
+    "psycopg2-binary>=2.9.13",
+    "pyarrow>=25.0.1",
+    "pyyaml>=6.0.3",
     "requests>=2.34.2",
+    "sqlalchemy>=2.0.52",
+    "tenacity>=9.1.4",
 ]
 
 [project.scripts]
 data-pipeline = "data_pipeline:main"
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.pyright]
+include = ["src"]
+extraPaths = ["src/log_config"]
+
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "responses>=0.26.3",
+]
