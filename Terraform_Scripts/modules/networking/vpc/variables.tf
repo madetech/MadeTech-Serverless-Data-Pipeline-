@@ -11,7 +11,7 @@ variable "subnet_a_name" {
 }
 
 variable "subnet_b_name" {
-  type = string 
+  type = string
 }
 
 variable "availability_zone_a" {
@@ -28,7 +28,7 @@ variable "security_group_name" {
 
 # defining cidr blocks 
 variable "vpc_cidr" {
-  type = string 
+  type    = string
   default = "10.0.0.0/16"
 }
 variable "subnet_a_cidr" {
