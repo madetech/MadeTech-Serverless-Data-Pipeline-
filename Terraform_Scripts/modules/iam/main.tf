@@ -102,3 +102,39 @@ resource "aws_iam_policy" "rds_access" {
   description = "Access policy for ${var.rds_arn}"
   policy      = data.aws_iam_policy_document.rds_access.json
 }
+
+# Step Function Role (State Machine)
+
+resource "aws_iam_role" "StateMachineRole" {
+  name               = "StepFunctions-Terraform-Role"
+  
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "states.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+
+data "aws_iam_policy_document" "scheduler_assume_role_policy" {
+  statement {
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["scheduler.amazonaws.com"]
+    }
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "SchedulerRole" {
+  name               = "EventBridgeScheduler-Terraform-Role"
+  assume_role_policy = data.aws_iam_policy_document.scheduler_assume_role_policy.json
+}

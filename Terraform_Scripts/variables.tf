@@ -8,7 +8,12 @@ variable "log_level" {
   default = "info"
 }
 
-variable "application_name" {
+variable "s3_staging_bucket_name" {
+  type = string 
+  default = "mt-serverless-data-pipeline-bucket"
+}
+
+variable "project_name" {
   type    = string
   default = "data_pipeline"
 }

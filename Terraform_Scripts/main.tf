@@ -5,23 +5,23 @@ provider "aws" {
 module "vpc" {
   source = "./modules/networking/vpc"
 
-  project_name        = var.application_name
+  project_name        = var.project_name
   availability_zone_a = "eu-west-2a"
   availability_zone_b = "eu-west-2b"
   subnet_group_name   = "rds-db-subnet-group"
   subnet_a_name       = "rds-subnet-1a"
   subnet_b_name       = "rds-subnet-1b"
   security_group_name = "rds-security-group"
-
+  
 }
 
 # S3 Bucket Creation
 module "s3" {
   source             = "./modules/s3"
-  bucket_name        = "mt-serverless-data-pipeline-bucket-dev"
+  bucket_name        = "${var.s3_staging_bucket_name}-${var.environment_name}"
   versioning_enabled = false
   environment_name   = var.environment_name
-  project_name       = "data-pipeline"
+  project_name       = var.project_name
 
 }
 
@@ -39,21 +39,23 @@ module "rds" {
   vpc_security_group_ids = [module.vpc.security_group_id]
   skip_final_snapshot    = true
   publicly_accessible    = false
-  project_name           = var.application_name
+  project_name           = var.project_name
 }
 
 module "iam" {
   source = "./modules/iam"
 
-  project_name  = var.application_name
+  project_name  = var.project_name
   s3_bucket_arn = module.s3.bucket_arn
   rds_arn       = module.rds.db_arn
+  
+  
 }
 
 module "lambda" {
   source = "./modules/lambda"
 
-  project_name            = var.application_name
+  project_name            = var.project_name
   environment_name        = var.environment_name
   extraction_role_arn     = module.iam.extraction_lambda_role_arn
   transformation_role_arn = module.iam.transformation_lambda_role_arn
@@ -65,15 +67,54 @@ module "lambda" {
   db_name                 = "target_db"
   db_user                 = "db_user"
   db_password             = var.rds_password
-  lambda_layer_zip_path   = "${path.root}/python.zip"
+  # lambda_layer_zip_path   = "${path.root}/python.zip"
 }
 
-module "eventbridge" {
-  source = "./modules/eventbridge"
+module "step_function_state_machine"{
+  source = "./modules/step_function/state_machine"
 
-  project_name                 = var.application_name
-  s3_bucket_name               = module.s3.bucket_id
-  transformation_function_arn  = module.lambda.transformation_function_arn
-  transformation_function_name = module.lambda.transformation_function_name
+  state_machine_name = "data_pipeline_dev_state_machine"
+  role_arn = module.iam.state_machine_access_policy_arn
+  depends_on = [module.lambda.transformation_function_arn, module.lambda.extraction_lambda_role_arn]
+
+  
 }
 
+# Adding IAM permissions for Step Function State Machine to root main.tf
+data "aws_iam_policy_document" "state_machine_permissions_policy" {
+  statement {
+    effect  = "Allow"
+    actions = ["lambda:InvokeFunction"]
+    resources = [
+      module.lambda.extraction_function_arn,
+      "${module.lambda.extraction_function_arn}:*",
+      module.lambda.transformation_function_arn,
+      "${module.lambda.transformation_function_arn}:*"
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "state_machine_permissions" {
+  role   = module.iam.state_machine_role_id   
+  policy = data.aws_iam_policy_document.state_machine_permissions_policy.json
+}
+
+module "eventbridge_schduler" {
+  source                  = "./modules/eventbridge"
+  project_name            = var.project_name
+  step_function_arn       = module.step_function_state_machine.step_function_arn
+  step_function_role_arn  = module.iam.scheduler_role_arn
+}
+# eventbridge scheduler policy
+data "aws_iam_policy_document" "scheduler_permissions_policy" {
+  statement {
+    effect    = "Allow"
+    actions   = ["states:StartExecution"]
+    resources = [module.step_function_state_machine.step_function_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "scheduler_permissions" {
+  role   = module.iam.scheduler_role_id
+  policy = data.aws_iam_policy_document.scheduler_permissions_policy.json
+}

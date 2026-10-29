@@ -1,3 +1,8 @@
 output "rule_arn" {
-  value = aws_cloudwatch_event_rule.s3_object_created.arn
+  value = aws_scheduler_schedule.step_function_schedule.arn
 }
+
+output "rule_name" {
+  value = aws_scheduler_schedule.step_function_schedule.name
+}
+

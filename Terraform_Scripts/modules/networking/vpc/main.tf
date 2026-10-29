@@ -44,19 +44,27 @@ resource "aws_security_group" "main" {
   name        = "rds_security_group"
   description = "Security group for RDS Postgres Instance"
   vpc_id      = aws_vpc.main.id
-  ingress {
+}
+
+# Inbound rule for RDS
+resource "aws_security_group_rule" "rds_ingress"{
+    type = "ingress"
+    description = "Inbound Rule for RDS instance"
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    security_group_id = aws_security_group.main.id
+    
   }
-  egress {
+
+# Outbound rule for RDS
+resource "aws_security_group_rule" "rds_egress"{
+    type = "egress" 
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+    security_group_id = aws_security_group.main.id
   }
-  tags = {
-    name = var.security_group_name #"rds-security-group"
-  }
-}
+  

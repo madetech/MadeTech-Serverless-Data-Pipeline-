@@ -1,6 +1,6 @@
 #S3 Bucket Creation
 resource "aws_s3_bucket" "main" {
-  bucket = "mt-serverless-data-pipeline-bucket-dev"
+  bucket = "${var.bucket_name}-${var.environment_name}"
   # mt-serverless-data-pipeline-bucket-dev
   tags = {
     Name        = var.project_name
